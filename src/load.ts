@@ -46,14 +46,13 @@ export const loadRoles = (guild: Guild, backupData: BackupData): Promise<Role[]>
     const rolePromises: Promise<Role>[] = [];
     backupData.roles.forEach((roleData) => {
         if (roleData.isEveryone) {
-            rolePromises.push(
-                guild.roles.cache.get(guild.id).edit({
-                    name: roleData.name,
-                    color: roleData.color,
-                    permissions: BigInt(roleData.permissions),
-                    mentionable: roleData.mentionable
-                })
-            );
+            const guildData = guild.roles.cache.get(guild.id)?.edit({
+                name: roleData.name,
+                color: roleData.color,
+                permissions: BigInt(roleData.permissions),
+                mentionable: roleData.mentionable
+            })
+            if(guildData) rolePromises.push(guildData);
         } else {
             rolePromises.push(
                 guild.roles.create({
@@ -87,7 +86,7 @@ export const loadChannels = (guild: Guild, backupData: BackupData, options: Load
         );
     });
     backupData.channels.others.forEach((channelData) => {
-        loadChannelPromises.push(loadChannel(channelData, guild, null, options));
+        loadChannelPromises.push(loadChannel(channelData, guild, undefined, options));
     });
     return Promise.all(loadChannelPromises);
 };
@@ -98,7 +97,7 @@ export const loadChannels = (guild: Guild, backupData: BackupData, options: Load
 export const loadAFK = (guild: Guild, backupData: BackupData): Promise<Guild[]> => {
     const afkPromises: Promise<Guild>[] = [];
     if (backupData.afk) {
-        afkPromises.push(guild.setAFKChannel(guild.channels.cache.find((ch) => ch.name === backupData.afk.name && ch.type === "GUILD_VOICE") as VoiceChannel));
+        afkPromises.push(guild.setAFKChannel(guild.channels.cache.find((ch) => ch.name === backupData.afk?.name && ch.type === "GUILD_VOICE") as VoiceChannel));
         afkPromises.push(guild.setAFKTimeout(backupData.afk.timeout));
     }
     return Promise.all(afkPromises);

@@ -8,5 +8,4 @@ export interface ThreadChannelData {
     autoArchiveDuration: ThreadAutoArchiveDuration;
     locked: boolean;
     rateLimitPerUser: number;
-    messages: MessageData[];
 }

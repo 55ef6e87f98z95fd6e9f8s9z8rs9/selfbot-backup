@@ -65,7 +65,6 @@ export const create = async (
     guild: Guild,
     options: CreateOptions = {
         backupID: undefined,
-        maxMessagesPerChannel: 10,
         jsonSave: true,
         jsonBeautify: true,
         doNotBackup: [],
@@ -92,7 +91,7 @@ export const create = async (
                 members: [],
                 createdTimestamp: Date.now(),
                 guildID: guild.id,
-                id: options.backupID ?? SnowflakeUtil.generate().toString()
+                id: options.backupID ?? SnowflakeUtil.generate(Date.now()).toString()
             };
             if (guild.iconURL()) {
                 if (options && options.saveImages && options.saveImages === 'base64') {
@@ -160,7 +159,6 @@ export const load = async (
     guild: Guild,
     options: LoadOptions = {
         clearGuildBeforeRestore: true,
-        maxMessagesPerChannel: 10
     }
 ) => {
     return new Promise(async (resolve, reject) => {

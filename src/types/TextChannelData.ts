@@ -6,6 +6,5 @@ export interface TextChannelData extends BaseChannelData {
     topic?: string;
     rateLimitPerUser?: number;
     isNews: boolean;
-    messages: MessageData[];
     threads: ThreadChannelData[];
 }

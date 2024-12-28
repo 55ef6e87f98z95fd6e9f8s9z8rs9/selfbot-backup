@@ -1,4 +1,5 @@
 import type {
+    BackupInfos,
     BanData,
     CategoryData,
     ChannelsData,
@@ -8,7 +9,7 @@ import type {
     TextChannelData,
     VoiceChannelData
 } from './types';
-import type { CategoryChannel, Collection, Guild, GuildChannel, Snowflake, TextChannel, ThreadChannel, VoiceChannel } from 'discord.js-selfbot-v13';
+import type { CategoryChannel, Collection, Guild, GuildBan, GuildChannel, Snowflake, TextChannel, ThreadChannel, VoiceChannel } from 'discord.js-selfbot-v13';
 import nodeFetch from 'node-fetch';
 import { fetchChannelPermissions, fetchTextChannelData, fetchVoiceChannelData } from './util';
 import { MemberData } from './types/MemberData';
@@ -20,11 +21,11 @@ import { MemberData } from './types/MemberData';
  */
 export async function getBans(guild: Guild) {
     const bans: BanData[] = [];
-    const cases = await guild.bans.fetch(); // Gets the list of the banned members
-    cases.forEach((ban) => {
+    const cases: Collection<Snowflake, GuildBan> | null = await guild.bans.fetch().catch(e=> null) // Gets the list of the banned members
+    cases?.forEach((ban) => {
         bans.push({
             id: ban.user.id, // Banned member ID
-            reason: ban.reason // Ban reason
+            reason: ban.reason || undefined // Ban reason
         });
     });
     return bans;
@@ -42,8 +43,8 @@ export async function getMembers(guild: Guild) {
             userId: member.user.id, // Member ID
             username: member.user.username, // Member username
             discriminator: member.user.discriminator, // Member discriminator
-            avatarUrl: member.user.avatarURL(), // Member avatar URL
-            joinedTimestamp: member.joinedTimestamp, // Member joined timestamp
+            avatarUrl: member.user.avatarURL() as string, // Member avatar URL
+            joinedTimestamp: member.joinedTimestamp as number, // Member joined timestamp
             roles: member.roles.cache.map((role) => role.id), // Member roles
             bot: member.user.bot // Member bot
         });
@@ -86,7 +87,7 @@ export async function getEmojis(guild: Guild, options: CreateOptions) {
     const emojis: EmojiData[] = [];
     guild.emojis.cache.forEach(async (emoji) => {
         const eData: EmojiData = {
-            name: emoji.name
+            name: emoji.name as string
         };
         if (options.saveImages && options.saveImages === 'base64') {
             eData.base64 = (await nodeFetch(emoji.url).then((res) => res.buffer())).toString('base64');

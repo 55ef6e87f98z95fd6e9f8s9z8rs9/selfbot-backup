@@ -24,7 +24,8 @@ import {
     Webhook,
     PremiumTier,
     MessageAttachment,
-    ChannelLogsQueryOptions
+    ChannelLogsQueryOptions,
+    ThreadAutoArchiveDuration
 } from 'discord.js-selfbot-v13';
 import nodeFetch from 'node-fetch';
 
@@ -67,60 +68,13 @@ export async function fetchVoiceChannelData(channel: VoiceChannel) {
             name: channel.name,
             bitrate: channel.bitrate,
             userLimit: channel.userLimit,
-            parent: channel.parent ? channel.parent.name : null,
+            parent: channel.parent ? channel.parent.name : undefined,
             permissions: fetchChannelPermissions(channel)
         };
         /* Return channel data */
         resolve(channelData);
     });
 }
-
-export async function fetchChannelMessages (channel: TextChannel | NewsChannel | ThreadChannel, options: CreateOptions): Promise<MessageData[]> {
-    let messages: MessageData[] = [];
-    const messageCount: number = isNaN(options.maxMessagesPerChannel) ? 10 : options.maxMessagesPerChannel;
-    const fetchOptions:  ChannelLogsQueryOptions = { limit: 100 };
-    let lastMessageId: Snowflake;
-    let fetchComplete: boolean = false;
-    while (!fetchComplete) {
-        if (lastMessageId) {
-            fetchOptions.before = lastMessageId;
-        }
-        const fetched: Collection<Snowflake, Message> = await channel.messages.fetch(fetchOptions);
-        if (fetched.size === 0) {
-            break;
-        }
-        lastMessageId = fetched.last().id;
-        await Promise.all(fetched.map(async (msg) => {
-            if (!msg.author || messages.length >= messageCount) {
-                fetchComplete = true;
-                return;
-            }
-            const files = await Promise.all(msg.attachments.map(async (a) => {
-                let attach = a.url
-                if (a.url && ['png', 'jpg', 'jpeg', 'jpe', 'jif', 'jfif', 'jfi'].includes(a.url)) {
-                    if (options.saveImages && options.saveImages === 'base64') {
-                        attach = (await (nodeFetch(a.url).then((res) => res.buffer()))).toString('base64')
-                    }
-                }
-                return {
-                    name: a.name,
-                    attachment: attach
-                };
-            }))
-            messages.push({
-                username: msg.author.username,
-                avatar: msg.author.displayAvatarURL(),
-                content: msg.cleanContent,
-                embeds: msg.embeds,
-                files,
-                pinned: msg.pinned,
-                sentAt: msg.createdAt.toISOString(),
-            });
-        }));
-    }
-
-    return messages;
-} 
 
 /**
  * Fetches the text channel data that is necessary for the backup
@@ -132,10 +86,9 @@ export async function fetchTextChannelData(channel: TextChannel | NewsChannel, o
             name: channel.name,
             nsfw: channel.nsfw,
             rateLimitPerUser: channel.type === "GUILD_TEXT" ? channel.rateLimitPerUser : undefined,
-            parent: channel.parent ? channel.parent.name : null,
-            topic: channel.topic,
+            parent: channel.parent ? channel.parent.name : undefined,
+            topic: channel.topic || undefined,
             permissions: fetchChannelPermissions(channel),
-            messages: [],
             isNews: channel.type === "GUILD_NEWS",
             threads: []
         };
@@ -145,14 +98,12 @@ export async function fetchTextChannelData(channel: TextChannel | NewsChannel, o
                 const threadData: ThreadChannelData = {
                     type: thread.type,
                     name: thread.name,
-                    archived: thread.archived,
-                    autoArchiveDuration: thread.autoArchiveDuration,
-                    locked: thread.locked,
-                    rateLimitPerUser: thread.rateLimitPerUser,
-                    messages: []
+                    archived: thread.archived ? thread.archived : false,
+                    autoArchiveDuration: thread.autoArchiveDuration as ThreadAutoArchiveDuration,
+                    locked: thread.locked || false,
+                    rateLimitPerUser: thread.rateLimitPerUser as number,
                 };
                 try {
-                    threadData.messages = await fetchChannelMessages(thread, options);
                     /* Return thread data */
                     channelData.threads.push(threadData);
                 } catch {
@@ -162,8 +113,6 @@ export async function fetchTextChannelData(channel: TextChannel | NewsChannel, o
         }
         /* Fetch channel messages */
         try {
-            channelData.messages = await fetchChannelMessages(channel, options);
-
             /* Return channel data */
             resolve(channelData);
         } catch {
@@ -208,42 +157,10 @@ export async function loadChannel(
     options?: LoadOptions
 ) {
     return new Promise(async (resolve) => {
-
-        const loadMessages = (channel: TextChannel | ThreadChannel, messages: MessageData[], previousWebhook?: Webhook): Promise<Webhook|void> => {
-            return new Promise(async (resolve) => {
-                const webhook = previousWebhook || await (channel as TextChannel).createWebhook('MessagesBackup',{
-                    avatar: channel.client.user.displayAvatarURL()
-                }).catch(() => {});
-                if (!webhook) return resolve();
-                messages = messages
-                    .filter((m) => m.content.length > 0 || m.embeds.length > 0 || m.files.length > 0)
-                    .reverse();
-                messages = messages.slice(messages.length - options.maxMessagesPerChannel);
-                for (const msg of messages) {
-                    const sentMsg = await webhook
-                        .send({
-                            content: msg.content.length ? msg.content : undefined,
-                            username: msg.username,
-                            avatarURL: msg.avatar,
-                            embeds: msg.embeds,
-                            files: msg.files.map((f) => new MessageAttachment(f.attachment,f.name)),
-                            allowedMentions: options.allowedMentions,
-                            threadId: channel.isThread() ? channel.id : undefined
-                        })
-                        .catch((err) => {
-                            console.log(err.message);
-                        });
-                    if (msg.pinned && sentMsg) await (sentMsg as Message).pin();
-                }
-                resolve(webhook);
-            });
-        }
-
         const createOptions: GuildChannelCreateOptions = {
-            type: null,
             parent: category
         };
-        if (channelData.type === "GUILD_TEXT"|| channelData.type === "GUILD_NEWS") {
+        if (channelData.type === "GUILD_TEXT" || channelData.type === "GUILD_NEWS") {
             createOptions.topic = (channelData as TextChannelData).topic;
             createOptions.nsfw = (channelData as TextChannelData).nsfw;
             createOptions.rateLimitPerUser = (channelData as TextChannelData).rateLimitPerUser;
@@ -274,11 +191,6 @@ export async function loadChannel(
             });
             await channel.permissionOverwrites.set(finalPermissions);
             if (channelData.type === "GUILD_TEXT") {
-                /* Load messages */
-                let webhook: Webhook|void;
-                if ((channelData as TextChannelData).messages.length > 0) {
-                    webhook = await loadMessages(channel as TextChannel, (channelData as TextChannelData).messages).catch(() => {});
-                }
                 /* Load threads */
                 if ((channelData as TextChannelData).threads.length > 0) { //&& guild.features.includes('THREADS_ENABLED')) {
                     await Promise.all((channelData as TextChannelData).threads.map(async (threadData) => {
@@ -288,10 +200,7 @@ export async function loadChannel(
                         return (channel as TextChannel).threads.create({
                             name: threadData.name,
                             autoArchiveDuration
-                        }).then((thread) => {
-                            if (!webhook) return;
-                            return loadMessages(thread, threadData.messages, webhook);
-                        });
+                        })
                     }));
                 }
                 return channel;
