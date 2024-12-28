@@ -1,5 +1,5 @@
 {
-  "name": "discord-backup",
+  "name": "selfbot-backup",
   "version": "3.3.2",
   "description": "A complete framework to facilitate server backup using discord.js v12",
   "main": "lib/index.js",
