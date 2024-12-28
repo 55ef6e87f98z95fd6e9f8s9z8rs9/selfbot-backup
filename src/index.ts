@@ -2,12 +2,11 @@ import type { BackupData, BackupInfos, CreateOptions, LoadOptions } from './type
 import type { Guild } from 'discord.js-selfbot-v13';
 import { SnowflakeUtil } from 'discord.js-selfbot-v13';
 
-import nodeFetch from 'node-fetch';
 import { sep } from 'path';
 
 import { existsSync, mkdirSync, statSync, unlinkSync } from 'fs';
 import { writeFile, readdir } from 'fs/promises';
-
+import nodeFetch from "node-fetch"
 import * as createMaster from './create';
 import * as loadMaster from './load';
 import * as utilMaster from './util';
@@ -24,7 +23,7 @@ const getBackupData = async (backupID: string) => {
     return new Promise<BackupData>(async (resolve, reject) => {
         const files = await readdir(backups); // Read "backups" directory
         // Try to get the json file
-        const file = files.filter((f) => f.split('.').pop() === 'json').find((f) => f === `${backupID}.json`);
+        const file = files.filter((f: string) => f.split('.').pop() === 'json').find((f: string) => f === `${backupID}.json`);
         if (file) {
             // If the file exists
             const backupData: BackupData = require(`${backups}${sep}${file}`);
@@ -65,7 +64,7 @@ export const fetch = (backupID: string) => {
 export const create = async (
     guild: Guild,
     options: CreateOptions = {
-        backupID: null,
+        backupID: undefined,
         maxMessagesPerChannel: 10,
         jsonSave: true,
         jsonBeautify: true,
@@ -81,10 +80,10 @@ export const create = async (
                 verificationLevel: guild.verificationLevel,
                 explicitContentFilter: guild.explicitContentFilter,
                 defaultMessageNotifications: guild.defaultMessageNotifications,
-                afk: guild.afkChannel ? { name: guild.afkChannel.name, timeout: guild.afkTimeout } : null,
+                afk: guild.afkChannel ? { name: guild.afkChannel.name, timeout: guild.afkTimeout } : undefined,
                 widget: {
-                    enabled: guild.widgetEnabled,
-                    channel: guild.widgetChannel ? guild.widgetChannel.name : null
+                    enabled: guild.widgetEnabled as boolean,
+                    channel: guild.widgetChannel ? guild.widgetChannel.name : undefined
                 },
                 channels: { categories: [], others: [] },
                 roles: [],
@@ -98,26 +97,24 @@ export const create = async (
             if (guild.iconURL()) {
                 if (options && options.saveImages && options.saveImages === 'base64') {
                     backupData.iconBase64 = (
-                        await nodeFetch(guild.iconURL()).then((res) => res.buffer())
-                    ).toString('base64');
+                        await nodeFetch(guild.iconURL() as string).then((res: { arrayBuffer: () => any; }) => res.arrayBuffer())
+                    ).toString();
                 }
-                backupData.iconURL = guild.iconURL();
+                backupData.iconURL = guild.iconURL() as string;
             }
             if (guild.splashURL()) {
                 if (options && options.saveImages && options.saveImages === 'base64') {
-                    backupData.splashBase64 = (await nodeFetch(guild.splashURL()).then((res) => res.buffer())).toString(
-                        'base64'
+                    backupData.splashBase64 = (await nodeFetch(guild.splashURL() as string).then((res: { arrayBuffer: () => any; }) => res.arrayBuffer())).toString(
                     );
                 }
-                backupData.splashURL = guild.splashURL();
+                backupData.splashURL = guild.splashURL() as string;
             }
             if (guild.bannerURL()) {
                 if (options && options.saveImages && options.saveImages === 'base64') {
-                    backupData.bannerBase64 = (await nodeFetch(guild.bannerURL()).then((res) => res.buffer())).toString(
-                        'base64'
+                    backupData.bannerBase64 = (await nodeFetch(guild.bannerURL() as string).then((res: { arrayBuffer: () => any; }) => res.arrayBuffer())).toString(
                     );
                 }
-                backupData.bannerURL = guild.bannerURL();
+                backupData.bannerURL = guild.bannerURL() as string;
             }
             if (options && options.backupMembers) {
                 // Backup members
@@ -224,7 +221,7 @@ export const remove = async (backupID: string) => {
  */
 export const list = async () => {
     const files = await readdir(backups); // Read "backups" directory
-    return files.map((f) => f.split('.')[0]);
+    return files.map((f: string) => f.split('.')[0]);
 };
 
 /**
