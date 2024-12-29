@@ -1,7 +1,5 @@
 import type { BackupData, BackupInfos, CreateOptions, LoadOptions } from './types/';
 import type { Guild } from 'discord.js-selfbot-v13';
-import { SnowflakeUtil } from 'discord.js-selfbot-v13';
-
 import { sep } from 'path';
 
 import { existsSync, mkdirSync, statSync, unlinkSync } from 'fs';
@@ -19,11 +17,11 @@ if (!existsSync(backups)) {
 /**
  * Checks if a backup exists and returns its data
  */
-const getBackupData = async (backupID: string) => {
+const getBackupData = async (clientID: string, backupID: string) => {
     return new Promise<BackupData>(async (resolve, reject) => {
         const files = await readdir(backups); // Read "backups" directory
         // Try to get the json file
-        const file = files.filter((f: string) => f.split('.').pop() === 'json').find((f: string) => f === `${backupID}.json`);
+        const file = files.filter((f: string) => f.split('.').pop() === 'json').find((f: string) => backupID.includes(clientID) && f === `${backupID}.json`);
         if (file) {
             // If the file exists
             const backupData: BackupData = require(`${backups}${sep}${file}`);
@@ -39,9 +37,9 @@ const getBackupData = async (backupID: string) => {
 /**
  * Fetches a backyp and returns the information about it
  */
-export const fetch = (backupID: string) => {
+export const fetch = (clientID: string, backupID: string) => {
     return new Promise<BackupInfos>(async (resolve, reject) => {
-        getBackupData(backupID)
+        getBackupData(clientID, backupID)
             .then((backupData) => {
                 const size = statSync(`${backups}${sep}${backupID}.json`).size; // Gets the size of the file using fs
                 const backupInfos: BackupInfos = {
@@ -69,7 +67,8 @@ export const create = async (
         jsonBeautify: true,
         doNotBackup: [],
         backupMembers: false,
-        saveImages: ''
+        saveImages: '',
+        clientID: ''
     }
 ) => {
     return new Promise<BackupData>(async (resolve, reject) => {
@@ -91,7 +90,7 @@ export const create = async (
                 members: [],
                 createdTimestamp: Date.now(),
                 guildID: guild.id,
-                id: options.backupID ?? SnowflakeUtil.generate(Date.now()).toString()
+                id: options.backupID ?? `${(await list(options.clientID)).length + 1}${options.clientID}`,
             };
             if (guild.iconURL()) {
                 if (options && options.saveImages && options.saveImages === 'base64') {
@@ -159,14 +158,15 @@ export const load = async (
     guild: Guild,
     options: LoadOptions = {
         clearGuildBeforeRestore: true,
-    }
+    },
+    clientID: string
 ) => {
-    return new Promise(async (resolve, reject) => {
+    return new Promise<BackupData>(async (resolve, reject) => {
         if (!guild) {
             return reject('Invalid guild');
         }
         try {
-            const backupData: BackupData = typeof backup === 'string' ? await getBackupData(backup) : backup;
+            const backupData: BackupData = typeof backup === 'string' ? await getBackupData(clientID, backup) : backup;
             try {
                 if (options.clearGuildBeforeRestore === undefined || options.clearGuildBeforeRestore) {
                     // Clear the guild
@@ -192,7 +192,7 @@ export const load = async (
                 return reject(e);
             }
             // Then return the backup data
-            return resolve(backupData);
+            return resolve(backupData)
         } catch (e) {
             return reject('No backup found');
         }
@@ -202,9 +202,10 @@ export const load = async (
 /**
  * Removes a backup
  */
-export const remove = async (backupID: string) => {
+export const remove = async (clientID: string, backupID: string) => {
     return new Promise<void>((resolve, reject) => {
         try {
+            if(!backupID.includes(clientID)) return reject('Backup not found');
             require(`${backups}${sep}${backupID}.json`);
             unlinkSync(`${backups}${sep}${backupID}.json`);
             resolve();
@@ -217,9 +218,11 @@ export const remove = async (backupID: string) => {
 /**
  * Returns the list of all backup
  */
-export const list = async () => {
+export const list = async (clientID: string) => {
     const files = await readdir(backups); // Read "backups" directory
-    return files.map((f: string) => f.split('.')[0]);
+    return files
+    .filter(e=> e.split('.')[0].includes(clientID))
+    .map((f: string) => f.split('.')[0]);
 };
 
 /**

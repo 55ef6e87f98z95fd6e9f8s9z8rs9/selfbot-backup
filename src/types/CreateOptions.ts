@@ -6,4 +6,5 @@ export interface CreateOptions {
     doNotBackup?: string[];
     backupMembers?: boolean;
     saveImages?: string;
+    clientID: string;
 }

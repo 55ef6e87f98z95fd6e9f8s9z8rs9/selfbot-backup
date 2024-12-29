@@ -190,7 +190,7 @@ export async function loadChannel(
                 }
             });
             await channel.permissionOverwrites.set(finalPermissions);
-            if (channelData.type === "GUILD_TEXT") {
+            if (channelData.type === "GUILD_TEXT") {    
                 /* Load threads */
                 if ((channelData as TextChannelData).threads.length > 0) { //&& guild.features.includes('THREADS_ENABLED')) {
                     await Promise.all((channelData as TextChannelData).threads.map(async (threadData) => {
@@ -203,9 +203,9 @@ export async function loadChannel(
                         })
                     }));
                 }
-                return channel;
+                resolve(channel); 
             } else {
-                resolve(channel); // Return the channel
+                resolve({});
             }
         });
     });

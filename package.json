@@ -1,6 +1,6 @@
 {
   "name": "selfbot-backup",
-  "version": "3.3.19",
+  "version": "3.4.5",
   "description": "A complete framework to facilitate server backup using discord.js v12",
   "main": "src/index.js",
   "files": [
